@@ -8321,5 +8321,24 @@
     "isbn": "9785905295942",
     "pub": "Alt Graph",
     "c": "https://i.postimg.cc/DwkGYt6B/00031.jpg"
+  },
+  {
+    "id": 1779556303475,
+    "t": "В этом уголке мира",
+    "series": "В этом уголке мира",
+    "a": [
+      "Фумиё Коно"
+    ],
+    "g": [
+      "Драма"
+    ],
+    "v": 1,
+    "tv": 1,
+    "oneshot": true,
+    "p": 456,
+    "y": "2020",
+    "isbn": "9785905295676",
+    "pub": "Alt Graph",
+    "c": "https://i.postimg.cc/bwcnFKL8/00032.jpg"
   }
 ]
