@@ -8966,5 +8966,24 @@
     "isbn": "9785907576100",
     "pub": "Alt Graph",
     "c": "https://i.postimg.cc/PxRpbcNb/00037.jpg"
+  },
+  {
+    "id": 1779712034552,
+    "t": "Пино",
+    "series": "Пино",
+    "a": [
+      "Такаси Мураками"
+    ],
+    "g": [
+      "Фантастика"
+    ],
+    "v": 1,
+    "tv": 1,
+    "oneshot": true,
+    "p": 328,
+    "y": "2023",
+    "isbn": "9785907576254",
+    "pub": "Alt Graph",
+    "c": "https://i.postimg.cc/cHbg7j6T/00038.jpg"
   }
 ]
