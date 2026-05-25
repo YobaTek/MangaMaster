@@ -8886,5 +8886,25 @@
     "isbn": "9785905295997",
     "pub": "Alt Graph",
     "c": "https://i.postimg.cc/x1vmrtFm/00033.jpg"
+  },
+  {
+    "id": 1779711136627,
+    "t": "Кап-кап",
+    "series": "Кап-кап",
+    "a": [
+      "Пару Итагаки"
+    ],
+    "g": [
+      "Комедия",
+      "Драма"
+    ],
+    "v": 1,
+    "tv": 1,
+    "oneshot": true,
+    "p": 216,
+    "y": "2024",
+    "isbn": "9785907576483",
+    "pub": "Alt Graph",
+    "c": "https://i.postimg.cc/R0GnhqB8/00034.jpg"
   }
 ]
