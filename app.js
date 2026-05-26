@@ -37,7 +37,7 @@ function closeNotify() {
 const state = {
     database: [],
     collection: {},
-    view: { view: 0, cols: 4 },
+    view: { view: 0, cols: 4, sort: 'title' },
     mode: 0,
     editId: null,
     infoId: null,
@@ -111,7 +111,14 @@ function loadData() {
 
     const s = safeStorage.getItem('mm_s');
     if (s) {
-        try { state.view = JSON.parse(s); } catch (e) {}
+        try {
+            const parsed = JSON.parse(s);
+            state.view = {
+                view: parsed.view !== undefined ? parsed.view : 0,
+                cols: parsed.cols !== undefined ? parsed.cols : 4,
+                sort: parsed.sort !== undefined ? parsed.sort : 'title'
+            };
+        } catch (e) {}
     }
 }
 
@@ -503,6 +510,13 @@ function changeView() {
 function changeGridScale() {
     state.view.cols = +(document.getElementById('gridScale').value);
     applyGrid();
+    saveData();
+}
+
+function changeSort() {
+    state.view.sort = document.getElementById('sortType').value;
+    saveData();
+    render();
 }
 
 function applyView() {
@@ -517,6 +531,13 @@ function applyGrid() {
     const cols = state.view.cols;
     document.documentElement.style.setProperty('--grid-cols', cols);
     document.getElementById('gridScale').value = cols;
+}
+
+function applySort() {
+    const el = document.getElementById('sortType');
+    if (el) {
+        el.value = state.view.sort || 'title';
+    }
 }
 
 function openSettings() {
@@ -538,6 +559,7 @@ function closeAbout() {
 function U() {
     applyView();
     applyGrid();
+    applySort();
 }
 
 function openInfo(id) {
@@ -1460,6 +1482,30 @@ document.addEventListener('keydown', e => {
     }
 });
 
+const CURRENT_VERSION = '0.8.1';
+
+async function checkForUpdates() {
+    try {
+        const res = await fetch('index.html?cb=' + Date.now(), { cache: 'no-cache' });
+        if (!res.ok) return;
+        const text = await res.text();
+        const match = text.match(/<title>MangaMaster v([\d.]+)/i);
+        if (match && match[1]) {
+            const latest = match[1].trim();
+            if (latest !== CURRENT_VERSION) {
+                const toast = document.getElementById('updateToast');
+                const verStr = document.getElementById('updateVersionStr');
+                if (toast && verStr) {
+                    verStr.textContent = 'v' + latest;
+                    toast.style.display = 'flex';
+                }
+            }
+        }
+    } catch (err) {
+        console.warn('Update check failed:', err);
+    }
+}
+
 function init() {
     loadData();
     U();
@@ -1467,6 +1513,7 @@ function init() {
     buildSidebar();
     updateDbVersionInfo();
     updateDatabase(true);
+    checkForUpdates();
 }
 
 function scrollToTop() {
