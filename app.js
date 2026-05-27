@@ -47,7 +47,13 @@ const state = {
     filterGenre: '',
     seriesView: '',
     viewMode: 'owned',
-    resetScroll: false
+    resetScroll: false,
+    savedScrollTop: 0,
+    scrollPositions: { 
+        series: {},
+        seriesVolumes: {},
+        seriesList: {}
+    }
 };
 
 const safeStorage = {
@@ -208,8 +214,30 @@ function openSeriesView(seriesName) {
 }
 
 function closeSeriesView() {
+    const currentSeries = state.seriesView;
+    
+    // Сохраняем позицию томов серии перед выходом
+    const currentScroll = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    if (currentSeries && currentScroll > 0) {
+        if (!state.scrollPositions.seriesVolumes) state.scrollPositions.seriesVolumes = {};
+        state.scrollPositions.seriesVolumes[currentSeries] = currentScroll;
+    }
+    
     state.seriesView = '';
-    state.resetScroll = true;
+    state.resetScroll = false;
+    render();
+    
+    // Восстанавливаем позицию списка серий
+    const savedPos = state.scrollPositions?.seriesList?.main;
+    if (savedPos !== undefined && savedPos > 0) {
+        setTimeout(() => {
+            window.scrollTo(0, savedPos);
+        }, 50);
+    } else if (state.savedScrollTop > 0) {
+        setTimeout(() => {
+            window.scrollTo(0, state.savedScrollTop);
+        }, 50);
+    }
 }
 
 function isAnyFilterActive() {
@@ -566,6 +594,22 @@ function openInfo(id) {
     const item = state.database.find(i => String(i.id) === String(id));
     if (!item) return;
 
+    const currentScroll = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    
+    // Сохраняем позицию в зависимости от режима
+    if (state.seriesView) {
+        // Мы в режиме просмотра томов серии
+        if (!state.scrollPositions.seriesVolumes) state.scrollPositions.seriesVolumes = {};
+        state.scrollPositions.seriesVolumes[state.seriesView] = currentScroll;
+    } else if (state.mode === 1) {
+        // Мы в режиме списка серий
+        if (!state.scrollPositions.seriesList) state.scrollPositions.seriesList = {};
+        state.scrollPositions.seriesList.main = currentScroll;
+    } else {
+        // Обычный режим томов
+        state.savedScrollTop = currentScroll;
+    }
+
     state.infoId = id;
     const col = state.collection[id] || { owned: false, read: false, wishlist: false };
     const isOneshot = item.oneshot === true;
@@ -625,7 +669,7 @@ function toggleInfoOwned(e) {
     };
     updateInfoButtons();
     saveData();
-    render();
+    render(true);
 }
 
 function toggleInfoWishlist(e) {
@@ -639,7 +683,7 @@ function toggleInfoWishlist(e) {
     };
     updateInfoButtons();
     saveData();
-    render();
+    render(true);
 }
 
 function toggleInfoRead(e) {
@@ -652,7 +696,7 @@ function toggleInfoRead(e) {
     };
     updateInfoButtons();
     saveData();
-    render();
+    render(true);
 }
 
 function updateInfoButtons() {
@@ -679,6 +723,30 @@ function updateInfoButtons() {
 function closeInfoModal() {
     document.getElementById('infoModal').style.display = 'none';
     state.infoId = null;
+    
+    // Восстанавливаем позицию в зависимости от режима
+    if (state.seriesView) {
+        // Возвращаемся к просмотру томов серии
+        const savedPos = state.scrollPositions?.seriesVolumes?.[state.seriesView];
+        if (savedPos !== undefined && savedPos > 0) {
+            setTimeout(() => {
+                window.scrollTo(0, savedPos);
+            }, 50);
+        }
+    } else if (state.mode === 1) {
+        // Возвращаемся к списку серий
+        const savedPos = state.scrollPositions?.seriesList?.main;
+        if (savedPos !== undefined && savedPos > 0) {
+            setTimeout(() => {
+                window.scrollTo(0, savedPos);
+            }, 50);
+        }
+    } else if (state.savedScrollTop > 0) {
+        setTimeout(() => {
+            window.scrollTo(0, state.savedScrollTop);
+            state.savedScrollTop = 0;
+        }, 50);
+    }
 }
 
 document.addEventListener('keydown', function(e) {
@@ -890,7 +958,7 @@ function getBadgeString(item, isGroup) {
     }
 }
 
-function render() {
+function render(preserveScroll = false) {
     let items = getFilteredData();
     const sortType = (document.getElementById('sortType')?.value) || 'title';
     const query = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
@@ -985,13 +1053,12 @@ function render() {
     }
 
     const list = document.getElementById('list');
-    const scrollContainer = document.querySelector('.list-scroll');
     
-    let savedScrollTop = 0;
-    if (!state.resetScroll) {
-        savedScrollTop = scrollContainer.scrollTop;
+    let currentScrollTop = 0;
+    if (!preserveScroll) {
+        currentScrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
     }
-
+    
     if (!result.length) {
         const msg = state.seriesView ? 'Тома не найдены' :
             (state.filterAuthor || state.filterPublisher) ? 'Ничего не найдено по фильтру' : 'Ничего не найдено';
@@ -999,9 +1066,7 @@ function render() {
         
         if (state.resetScroll) {
             state.resetScroll = false;
-            requestAnimationFrame(() => {
-                scrollContainer.scrollTop = 0;
-            });
+            window.scrollTo(0, 0);
         }
         return;
     }
@@ -1055,19 +1120,29 @@ function render() {
         </div>`;
     }).join('');
 
-    if (state.resetScroll) {
-        state.resetScroll = false;
-        list.style.display = 'none';
+    if (preserveScroll) {
         requestAnimationFrame(() => {
             list.style.display = 'grid';
-            scrollContainer.scrollTop = 0;
+        });
+        return;
+    }
+
+    if (state.resetScroll) {
+        state.resetScroll = false;
+        requestAnimationFrame(() => {
+            list.style.display = 'grid';
+            window.scrollTo(0, 0);
         });
     } else {
         requestAnimationFrame(() => {
-            scrollContainer.scrollTop = savedScrollTop;
+            list.style.display = 'grid';
+            if (state.seriesView) {
+                window.scrollTo(0, 0);
+            } else {
+                window.scrollTo(0, currentScrollTop);
+            }
         });
     }
-
 }
 
 function updateBackButton() {
@@ -1384,6 +1459,13 @@ async function updateDatabase(silent = false) {
 }
 
 function openSeries(seriesName) {
+    // Сохраняем позицию списка серий перед входом
+    const currentScroll = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    if (!state.scrollPositions.seriesList) state.scrollPositions.seriesList = {};
+    state.scrollPositions.seriesList.main = currentScroll;
+    
+    state.savedScrollTop = currentScroll;
+    
     state.seriesView = seriesName;
     state.filterAuthor = '';
     state.filterPublisher = '';
@@ -1466,7 +1548,8 @@ document.addEventListener('keydown', e => {
             render();
             return;
         }
-        ['editModal', 'addModal', 'statsModal', 'settingsModal', 'aboutModal'].forEach(id => {
+        const modals = ['editModal', 'addModal', 'statsModal', 'settingsModal', 'aboutModal', 'infoModal'];
+        modals.forEach(id => {
             const el = document.getElementById(id);
             if (el && el.style.display === 'flex') el.style.display = 'none';
         });
@@ -1517,26 +1600,91 @@ function init() {
 }
 
 function scrollToTop() {
-    const list = document.getElementById('list');
-    if (list && list.scrollTop > 0) {
-        list.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+let scrollTimeout;
 document.addEventListener('scroll', function(e) {
     const btn = document.getElementById('scrollToTop');
     if (!btn) return;
     
-    // Check if the scroll target has a scrollTop property, or check the document itself
-    const scrollTop = e.target.scrollTop || document.documentElement.scrollTop || document.body.scrollTop;
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
     
-    if (scrollTop > 300) {
-        btn.classList.add('show');
-    } else {
-        btn.classList.remove('show');
-    }
+    if (scrollTimeout) clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+        if (scrollTop > 300) {
+            btn.classList.add('show');
+        } else {
+            btn.classList.remove('show');
+        }
+    }, 50);
 }, true);
+
+// ---------- EASTER EGG: 10 кликов по окну "О программе" ----------
+let aboutClickCount = 0;
+let aboutClickTimer;
+
+function setupAboutEasterEgg() {
+    const aboutModal = document.getElementById('aboutModal');
+    if (!aboutModal) return;
+    
+    const modalContent = aboutModal.querySelector('.modal-content');
+    if (!modalContent) return;
+    
+    modalContent.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') return;
+        if (e.target.id === 'easterEggImage') return;
+        
+        aboutClickCount++;
+        clearTimeout(aboutClickTimer);
+        aboutClickTimer = setTimeout(() => {
+            aboutClickCount = 0;
+        }, 1000);
+        
+        if (aboutClickCount === 10) {
+            showEasterEggImage();
+            aboutClickCount = 0;
+        }
+    });
+}
+
+function showEasterEggImage() {
+    const oldImg = document.getElementById('easterEggImage');
+    if (oldImg) oldImg.remove();
+    
+    const img = document.createElement('img');
+    img.id = 'easterEggImage';
+    // 🔁 ЗАМЕНИТЕ ЭТУ ССЫЛКУ НА ВАШУ КАРТИНКУ:
+    img.src = 'https://i.postimg.cc/P5Tgr8kk/secret.gif';
+    
+    img.style.maxWidth = '100%';
+    img.style.width = 'auto';
+    img.style.height = 'auto';
+    img.style.borderRadius = '12px';
+    img.style.marginTop = '16px';
+    img.style.border = '2px solid var(--accent)';
+    img.style.boxShadow = '0 0 20px rgba(255,32,64,0.3)';
+    img.style.animation = 'fadeInScale 0.3s ease';
+    
+    const modalContent = document.querySelector('#aboutModal .modal-content');
+    const closeBtn = modalContent.querySelector('.btn');
+    modalContent.insertBefore(img, closeBtn);
+    
+    setTimeout(() => {
+        const imgToRemove = document.getElementById('easterEggImage');
+        if (imgToRemove) imgToRemove.remove();
+    }, 7600);
+}
+
+function preloadEasterEggImage() {
+    const img = new Image();
+    img.src = 'https://i.postimg.cc/P5Tgr8kk/secret.gif';
+    console.log('🥚 Пасхалка предзагружена');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setupAboutEasterEgg();
+    setTimeout(preloadEasterEggImage, 1000);
+});
 
 init();

@@ -1,7 +1,25 @@
 :root{--bg:#0f0f12;--card:#1a1a1e;--text:#fff;--dim:#a0a0a0;--brd:#2d2d32;--input:#252529;--accent:#ff2040;--gold:#ffc107;--read:#00ff41;--tree:#4caf50;--time:#00bcd4;--vol-bg:#2196f3;--oneshot-bg:#9c27b0;--grid-cols:4;}
 *{box-sizing:border-box;margin:0;padding:0;}
-html{scrollbar-gutter:stable;background-color:var(--bg);height:100%;}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.4;transition:.3s;min-height:100vh;display:flex;flex-direction:column;}
+
+/* Фикс прыгающего скролла — резервируем место под скроллбар */
+html {
+    scrollbar-gutter: stable;
+    overflow-y: auto;
+    height: 100%;
+}
+
+body {
+    font-family:'Segoe UI',system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    line-height:1.4;
+    transition:.3s;
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+    scrollbar-gutter: stable;
+}
+
 .container{max-width:1440px;width:100%;margin:0 auto;padding:0 16px;display:flex;flex-direction:column;min-height:100vh;}
 
 /* Логотип и навигация */
@@ -47,7 +65,7 @@ select{cursor:pointer;}
 
 /* Основной макет */
 .main-layout{display:flex;gap:14px;flex:1;min-height:0;}
-.list-scroll{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow-y:auto;}
+.list-scroll{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow-y:visible;}
 
 /* Сайдбар */
 .sidebar{width:220px;min-width:220px;flex-shrink:0;background:var(--card);border-radius:10px;border:1px solid var(--brd);padding:10px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;max-height:100%;}
@@ -225,8 +243,11 @@ select{cursor:pointer;}
 
 /* Мобильные */
 @media(max-width:768px){.container{padding:6px 8px 10px;}.top-nav{flex-direction:column;gap:8px;margin-bottom:8px;align-items:flex-start;}.logo-box{align-self:flex-start;}.nav-actions{align-self:flex-end;}.controls-wrapper{position:static;}.sidebar{width:100%;min-width:100%;max-height:200px;}.main-layout{flex-direction:column;}.manga-grid{grid-template-columns:repeat(2,1fr)!important;gap:8px;}.tools{grid-template-columns:1fr 1fr!important;}.tools .search-wrap{grid-column:1/-1;}.list-view .card-body{grid-template-columns:1.5fr 1fr 1fr;gap:5px;padding:0 8px;}.btn{font-size:10px;}.btn-icon{width:36px;}.stats-hero{grid-template-columns:1fr 1fr;}.stats-hero-wide{grid-template-columns:1fr;}.info-layout-vert .info-cover-wrap{width:160px;}.modal-content{max-width:95%;}}
+
+/* Кастомный скроллбар */
 ::-webkit-scrollbar{width:7px;}::-webkit-scrollbar-track{background:var(--bg);border-radius:10px;}::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px;}::-webkit-scrollbar-thumb:hover{background:var(--accent);}
 
+/* Кнопка "Наверх" */
 .btn-scroll-top {
     position: fixed;
     bottom: 20px;
@@ -245,4 +266,10 @@ select{cursor:pointer;}
 }
 .btn-scroll-top.show {
     display: block;
+}
+
+/* Анимация для пасхалки */
+@keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
 }
