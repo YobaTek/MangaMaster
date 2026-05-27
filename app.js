@@ -1565,7 +1565,7 @@ document.addEventListener('keydown', e => {
     }
 });
 
-const CURRENT_VERSION = '0.8.1';
+const CURRENT_VERSION = '0.8.3';
 
 async function checkForUpdates() {
     try {
