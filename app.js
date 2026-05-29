@@ -216,7 +216,6 @@ function openSeriesView(seriesName) {
 function closeSeriesView() {
     const currentSeries = state.seriesView;
     
-    // Сохраняем позицию томов серии перед выходом
     const currentScroll = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
     if (currentSeries && currentScroll > 0) {
         if (!state.scrollPositions.seriesVolumes) state.scrollPositions.seriesVolumes = {};
@@ -227,7 +226,6 @@ function closeSeriesView() {
     state.resetScroll = false;
     render();
     
-    // Восстанавливаем позицию списка серий
     const savedPos = state.scrollPositions?.seriesList?.main;
     if (savedPos !== undefined && savedPos > 0) {
         setTimeout(() => {
@@ -543,22 +541,26 @@ function changeGridScale() {
 
 function changeSort() {
     state.view.sort = document.getElementById('sortType').value;
+    applySort();
     saveData();
     render();
 }
 
+// Wait, looking at changeSort - let's see if there is any other details
 function applyView() {
     const list = document.getElementById('list');
     list.className = 'manga-grid';
     if (state.view.view === 1) list.classList.add('list-view');
     if (state.view.view === 2) list.classList.add('covers-only');
     document.getElementById('viewType').value = state.view.view;
+    syncCustomSelect('viewType');
 }
 
 function applyGrid() {
     const cols = state.view.cols;
     document.documentElement.style.setProperty('--grid-cols', cols);
     document.getElementById('gridScale').value = cols;
+    syncCustomSelect('gridScale');
 }
 
 function applySort() {
@@ -566,6 +568,69 @@ function applySort() {
     if (el) {
         el.value = state.view.sort || 'title';
     }
+    syncCustomSelect('sortType');
+}
+
+function toggleCustomDropdown(event, id) {
+    event.stopPropagation();
+    const dropdown = document.getElementById(id);
+    if (!dropdown) return;
+    
+    document.querySelectorAll('.custom-select').forEach(cs => {
+        if (cs.id !== id) {
+            cs.classList.remove('open');
+        }
+    });
+    
+    dropdown.classList.toggle('open');
+}
+
+function chooseCustomOption(nativeSelectId, value) {
+    const nativeSelect = document.getElementById(nativeSelectId);
+    if (!nativeSelect) return;
+    
+    nativeSelect.value = value;
+    
+    if (nativeSelectId === 'viewType') {
+        changeView();
+    } else if (nativeSelectId === 'gridScale') {
+        changeGridScale();
+    } else if (nativeSelectId === 'sortType') {
+        changeSort();
+    }
+    
+    document.querySelectorAll('.custom-select').forEach(cs => {
+        cs.classList.remove('open');
+    });
+}
+
+function syncCustomSelect(nativeSelectId) {
+    const nativeSelect = document.getElementById(nativeSelectId);
+    if (!nativeSelect) return;
+    
+    const val = String(nativeSelect.value);
+    
+    let wrapperId = '';
+    if (nativeSelectId === 'viewType') wrapperId = 'customSelectView';
+    else if (nativeSelectId === 'gridScale') wrapperId = 'customSelectScale';
+    else if (nativeSelectId === 'sortType') wrapperId = 'customSelectSort';
+    
+    const wrapper = document.getElementById(wrapperId);
+    if (!wrapper) return;
+    
+    const triggerVal = wrapper.querySelector('.custom-val');
+    const items = wrapper.querySelectorAll('.custom-select-item');
+    
+    items.forEach(item => {
+        if (String(item.dataset.value) === val) {
+            item.classList.add('active');
+            if (triggerVal) {
+                triggerVal.textContent = item.textContent;
+            }
+        } else {
+            item.classList.remove('active');
+        }
+    });
 }
 
 function openSettings() {
@@ -591,22 +656,21 @@ function U() {
 }
 
 function openInfo(id) {
+    const menu = document.getElementById('seriesContextMenu');
+    if (menu) menu.style.display = 'none';
+
     const item = state.database.find(i => String(i.id) === String(id));
     if (!item) return;
 
     const currentScroll = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
     
-    // Сохраняем позицию в зависимости от режима
     if (state.seriesView) {
-        // Мы в режиме просмотра томов серии
         if (!state.scrollPositions.seriesVolumes) state.scrollPositions.seriesVolumes = {};
         state.scrollPositions.seriesVolumes[state.seriesView] = currentScroll;
     } else if (state.mode === 1) {
-        // Мы в режиме списка серий
         if (!state.scrollPositions.seriesList) state.scrollPositions.seriesList = {};
         state.scrollPositions.seriesList.main = currentScroll;
     } else {
-        // Обычный режим томов
         state.savedScrollTop = currentScroll;
     }
 
@@ -630,7 +694,7 @@ function openInfo(id) {
     let badges = '';
     if (isOneshot) {
         badges += '<span class="vol-badge oneshot">ВАНШОТ</span> ';
-    } else if (item.v > 0) {
+    } else if (item.v !== undefined && item.v !== null && item.v !== '' && item.v >= 0) {
         badges += `<span class="vol-badge">Том ${item.v}</span> `;
     }
     document.getElementById('infoBadges').innerHTML = badges;
@@ -664,7 +728,7 @@ function toggleInfoOwned(e) {
     const newOwned = !col.owned;
     state.collection[state.infoId] = {
         owned: newOwned,
-        wishlist: newOwned ? false : col.wishlist,
+        wishlist: col.wishlist,
         read: col.read
     };
     updateInfoButtons();
@@ -677,7 +741,7 @@ function toggleInfoWishlist(e) {
     const col = state.collection[state.infoId] || { owned: false, read: false, wishlist: false };
     const newWishlist = !col.wishlist;
     state.collection[state.infoId] = {
-        owned: newWishlist ? false : col.owned,
+        owned: col.owned,
         wishlist: newWishlist,
         read: col.read
     };
@@ -704,6 +768,7 @@ function updateInfoButtons() {
     const ownedBtn = document.getElementById('infoOwnedBtn');
     const wishlistBtn = document.getElementById('infoWishlistBtn');
     const readBtn = document.getElementById('infoReadBtn');
+    const coverWrap = document.getElementById('infoCoverWrap');
 
     if (ownedBtn) {
         ownedBtn.classList.toggle('active', col.owned === true);
@@ -711,22 +776,26 @@ function updateInfoButtons() {
     }
     if (wishlistBtn) {
         wishlistBtn.classList.toggle('active', col.wishlist === true);
-        wishlistBtn.disabled = col.owned === true;
+        wishlistBtn.disabled = false;
     }
     if (readBtn) {
         readBtn.classList.toggle('active', col.read === true);
     }
-    if (col.owned === true && wishlistBtn) wishlistBtn.disabled = true;
-    if (col.wishlist === true && ownedBtn) ownedBtn.disabled = true;
+    if (coverWrap) {
+        const isNotOwned = (state.viewMode === 'owned' && col.owned !== true);
+        coverWrap.classList.toggle('not-owned', isNotOwned);
+        const badgesContainer = document.getElementById('infoBadges');
+        if (badgesContainer) {
+            badgesContainer.classList.toggle('not-owned', isNotOwned);
+        }
+    }
 }
 
 function closeInfoModal() {
     document.getElementById('infoModal').style.display = 'none';
     state.infoId = null;
     
-    // Восстанавливаем позицию в зависимости от режима
     if (state.seriesView) {
-        // Возвращаемся к просмотру томов серии
         const savedPos = state.scrollPositions?.seriesVolumes?.[state.seriesView];
         if (savedPos !== undefined && savedPos > 0) {
             setTimeout(() => {
@@ -734,7 +803,6 @@ function closeInfoModal() {
             }, 50);
         }
     } else if (state.mode === 1) {
-        // Возвращаемся к списку серий
         const savedPos = state.scrollPositions?.seriesList?.main;
         if (savedPos !== undefined && savedPos > 0) {
             setTimeout(() => {
@@ -758,36 +826,100 @@ document.addEventListener('keydown', function(e) {
         return;
     }
 
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        
-        const items = getFilteredData();
-        let result = [];
-
-        if (state.seriesView) {
-            result = [...items].sort((a, b) => (a.v || 0) - (b.v || 0));
-        } else if (state.mode === 0 || state.mode === 2) {
-            result = [...items].sort((a, b) => String(a.t).localeCompare(String(b.t)));
-            if (state.mode === 2) {
-                result = result.filter(x => x.v === 1 && x.tv === 1);
-            }
-        } else {
-            result = [...items].sort((a, b) => String(a.t).localeCompare(String(b.t)));
-        }
-
-        const currentIndex = result.findIndex(i => String(i.id) === String(state.infoId));
-        if (currentIndex === -1) return;
-
-        let newIndex;
-        if (e.key === 'ArrowLeft') {
-            newIndex = currentIndex > 0 ? currentIndex - 1 : result.length - 1;
-        } else {
-            newIndex = currentIndex < result.length - 1 ? currentIndex + 1 : 0;
-        }
-
-        openInfo(result[newIndex].id);
+        infoPrev();
+    } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        infoNext();
     }
 });
+
+function getNavigationList() {
+    let items = getFilteredData();
+    const sortType = (document.getElementById('sortType')?.value) || 'title';
+    const query = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+
+    if (state.seriesView && state.viewMode === 'owned') {
+        items = getMergedData();
+    }
+
+    if (state.filterAuthor) {
+        items = items.filter(x =>
+            x.a && Array.isArray(x.a) &&
+            x.a.some(a => String(a).toLowerCase() === state.filterAuthor.toLowerCase())
+        );
+    }
+    if (state.filterPublisher) {
+        items = items.filter(x =>
+            String(x.pub || '').toLowerCase() === state.filterPublisher.toLowerCase()
+        );
+    }
+    if (state.filterGenre) {
+        items = items.filter(x =>
+            x.g && Array.isArray(x.g) &&
+            x.g.some(g => String(g).toLowerCase() === state.filterGenre.toLowerCase())
+        );
+    }
+    if (state.seriesView) {
+        items = items.filter(x =>
+            String(x.series || x.t).trim() === state.seriesView
+        );
+    }
+
+    let result = [];
+
+    if (state.seriesView) {
+        result = [...items].sort((a, b) => (a.v || 0) - (b.v || 0));
+    } else if (state.mode === 0 || state.mode === 2) {
+        result = [...items];
+        if (sortType === 'pages') {
+            result.sort((a, b) => (b.p || 0) - (a.p || 0));
+        } else if (sortType === 'year') {
+            result.sort((a, b) => (b.y || '').localeCompare(a.y || ''));
+        } else {
+            result.sort((a, b) => {
+                const tc = String(a.t).localeCompare(String(b.t));
+                return tc !== 0 ? tc : (a.v || 0) - (b.v || 0);
+            });
+        }
+        if (state.mode === 2) {
+            result = result.filter(x => x.v === 1 && x.tv === 1);
+        }
+    } else {
+        result = [...items].sort((a, b) => {
+            const tc = String(a.t).localeCompare(String(b.t));
+            return tc !== 0 ? tc : (a.v || 0) - (b.v || 0);
+        });
+    }
+
+    if (!state.filterAuthor && !state.filterPublisher && !state.filterGenre && !state.seriesView && query) {
+        result = result.filter(x =>
+            String(x.t).toLowerCase().includes(query) ||
+            (x.a && Array.isArray(x.a) && x.a.some(a => String(a).toLowerCase().includes(query)))
+        );
+    }
+
+    return result;
+}
+
+function infoPrev() {
+    const result = getNavigationList();
+    const currentIndex = result.findIndex(i => String(i.id) === String(state.infoId));
+    if (currentIndex === -1) return;
+
+    const newIndex = currentIndex > 0 ? currentIndex - 1 : result.length - 1;
+    openInfo(result[newIndex].id);
+}
+
+function infoNext() {
+    const result = getNavigationList();
+    const currentIndex = result.findIndex(i => String(i.id) === String(state.infoId));
+    if (currentIndex === -1) return;
+
+    const newIndex = currentIndex < result.length - 1 ? currentIndex + 1 : 0;
+    openInfo(result[newIndex].id);
+}
 
 function toggleEditOneshot() {
     const checked = document.getElementById('editOneshot').checked;
@@ -802,25 +934,11 @@ function toggleEditOneshot() {
 }
 
 function onEditOwnedChange() {
-    const ownedChecked = document.getElementById('editOwned').checked;
-    const wishlistCheckbox = document.getElementById('editWishlist');
-    if (ownedChecked) {
-        wishlistCheckbox.checked = false;
-        wishlistCheckbox.disabled = true;
-    } else {
-        wishlistCheckbox.disabled = false;
-    }
+    // No mutual exclusion between owned and wishlist anymore
 }
 
 function onEditWishlistChange() {
-    const wishlistChecked = document.getElementById('editWishlist').checked;
-    const ownedCheckbox = document.getElementById('editOwned');
-    if (wishlistChecked) {
-        ownedCheckbox.checked = false;
-        ownedCheckbox.disabled = true;
-    } else {
-        ownedCheckbox.disabled = false;
-    }
+    // No mutual exclusion between owned and wishlist anymore
 }
 
 function openEdit(id) {
@@ -832,7 +950,7 @@ function openEdit(id) {
 
     document.getElementById('editTitle').value = i.t || '';
     document.getElementById('editSeries').value = isOneshot ? '' : (i.series || '');
-    document.getElementById('editVolume').value = i.v || '';
+    document.getElementById('editVolume').value = (i.v !== undefined && i.v !== null) ? i.v : '';
     document.getElementById('editPages').value = i.p || 0;
     document.getElementById('editYear').value = i.y || '';
     document.getElementById('editIsbn').value = i.isbn || '';
@@ -848,16 +966,8 @@ function openEdit(id) {
 
     const ownedCheckbox = document.getElementById('editOwned');
     const wishlistCheckbox = document.getElementById('editWishlist');
-    if (col.owned === true) {
-        wishlistCheckbox.disabled = true;
-        ownedCheckbox.disabled = false;
-    } else if (col.wishlist === true) {
-        ownedCheckbox.disabled = true;
-        wishlistCheckbox.disabled = false;
-    } else {
-        ownedCheckbox.disabled = false;
-        wishlistCheckbox.disabled = false;
-    }
+    ownedCheckbox.disabled = false;
+    wishlistCheckbox.disabled = false;
 
     clearBadges('edit', 'Authors');
     if (i.a && i.a.length > 0) {
@@ -894,7 +1004,8 @@ function saveEdit() {
         pub = document.getElementById('editPublisher').value.trim(),
         cv = document.getElementById('editCover').value.trim(),
         is = document.getElementById('editIsbn').value.trim(),
-        v = isOneshot ? 1 : (+(document.getElementById('editVolume').value) || 1);
+        volInput = document.getElementById('editVolume').value.trim(),
+        v = isOneshot ? 1 : (volInput === '' ? 1 : (isNaN(parseInt(volInput)) ? 1 : Math.max(0, parseInt(volInput))));
 
     Object.assign(i, {
         t: nt, series: gt, a,
@@ -950,10 +1061,10 @@ function getBadgeString(item, isGroup) {
         const cls = maxVol > 0 && count >= maxVol ? 'completed' : '';
         return `<div class="progress-wrap"><div class="progress-bar ${cls}"><div class="progress-fill" style="width:${pct}%"></div><div class="progress-text">${count}/${maxVol || '?'}</div></div></div>`;
     } else {
-        const v = item.v || 0;
+        const v = (item.v !== undefined && item.v !== null) ? item.v : null;
         const tv = item.tv || 0;
         if (v === 1 && tv === 1) return '<span class="vol-badge oneshot">ВАНШОТ</span>';
-        if (v > 0) return `<span class="vol-badge">Том ${v}</span>`;
+        if (v !== null && v !== '' && v >= 0) return `<span class="vol-badge">Том ${v}</span>`;
         return '';
     }
 }
@@ -1016,6 +1127,7 @@ function render(preserveScroll = false) {
             if (!acc[key]) {
                 acc[key] = { 
                     ...x, 
+                    t: key,
                     count: 0,
                     ownedCount: 0,
                     maxVol: 0, 
@@ -1085,13 +1197,17 @@ function render(preserveScroll = false) {
         const noCoverHtml = `<div class="no-cover" style="${coverUrl ? 'display:none' : ''}">📘</div>`;
 
         let clickHandler = '';
+        let contextMenuAttr = '';
         if (state.seriesView) {
             clickHandler = `event.stopPropagation();openInfo(${item.id})`;
+            contextMenuAttr = `oncontextmenu="handleVolumeContextMenu(event, ${item.id})"`;
         } else if (isGroup) {
             const sn = (item.series || item.t).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             clickHandler = `event.stopPropagation();openSeries('${sn}')`;
+            contextMenuAttr = `oncontextmenu="handleSeriesContextMenu(event, '${sn}')"`;
         } else {
             clickHandler = `event.stopPropagation();openInfo(${item.id})`;
+            contextMenuAttr = `oncontextmenu="handleVolumeContextMenu(event, ${item.id})"`;
         }
 
         let metaHtml = '';
@@ -1110,7 +1226,7 @@ function render(preserveScroll = false) {
         const notOwnedClass = (state.viewMode === 'owned' && item.owned === false) ? ' not-owned' : '';
         const inCollectionClass = (state.viewMode === 'all' && item.owned === true && !isGroup) ? ' in-collection' : '';
 
-        return `<div class="manga-card ${isCompleted ? 'completed' : ''}${isAllCollected ? 'completed' : ''}${notOwnedClass}${inCollectionClass}" onclick="${clickHandler}" style="cursor:pointer;">
+        return `<div class="manga-card ${isCompleted ? 'completed' : ''}${isAllCollected ? 'completed' : ''}${notOwnedClass}${inCollectionClass}" onclick="${clickHandler}" ${contextMenuAttr} style="cursor:pointer;">
             <div class="cover-wrap${notOwnedClass}">${coverHtml}${noCoverHtml}</div>
             <div class="card-body">
                 <div class="card-title" title="${item.t.replace(/"/g, '&quot;')}">${item.t}</div>
@@ -1459,7 +1575,6 @@ async function updateDatabase(silent = false) {
 }
 
 function openSeries(seriesName) {
-    // Сохраняем позицию списка серий перед входом
     const currentScroll = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
     if (!state.scrollPositions.seriesList) state.scrollPositions.seriesList = {};
     state.scrollPositions.seriesList.main = currentScroll;
@@ -1565,24 +1680,21 @@ document.addEventListener('keydown', e => {
     }
 });
 
-const CURRENT_VERSION = '0.8.3';
+const CURRENT_VERSION = '0.8.9';
 
 async function checkForUpdates() {
     try {
-        const res = await fetch('index.html?cb=' + Date.now(), { cache: 'no-cache' });
+        const res = await fetch('/?cb=' + Date.now(), { cache: 'no-cache' });
         if (!res.ok) return;
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('text/html')) {
+            return;
+        }
         const text = await res.text();
-        const match = text.match(/<title>MangaMaster v([\d.]+)/i);
-        if (match && match[1]) {
-            const latest = match[1].trim();
-            if (latest !== CURRENT_VERSION) {
-                const toast = document.getElementById('updateToast');
-                const verStr = document.getElementById('updateVersionStr');
-                if (toast && verStr) {
-                    verStr.textContent = 'v' + latest;
-                    toast.style.display = 'flex';
-                }
-            }
+        const match = text.match(/<title>MangaMaster v(\d+\.\d+\.\d+)<\/title>/);
+        if (match && match[1] && match[1] !== CURRENT_VERSION) {
+            console.log('New version detected! Auto-reloading client to update.', match[1]);
+            location.reload();
         }
     } catch (err) {
         console.warn('Update check failed:', err);
@@ -1654,8 +1766,7 @@ function showEasterEggImage() {
     
     const img = document.createElement('img');
     img.id = 'easterEggImage';
-    // 🔁 ЗАМЕНИТЕ ЭТУ ССЫЛКУ НА ВАШУ КАРТИНКУ:
-    img.src = 'https://i.postimg.cc/P5Tgr8kk/secret.gif';
+    img.src = 'images/secret.gif';
     
     img.style.maxWidth = '100%';
     img.style.width = 'auto';
@@ -1676,15 +1787,410 @@ function showEasterEggImage() {
     }, 7600);
 }
 
-function preloadEasterEggImage() {
-    const img = new Image();
-    img.src = 'https://i.postimg.cc/P5Tgr8kk/secret.gif';
-    console.log('🥚 Пасхалка предзагружена');
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     setupAboutEasterEgg();
-    setTimeout(preloadEasterEggImage, 1000);
 });
+
+// ---------- КОНТЕКСТНОЕ МЕНЮ ДЛЯ СЕРИЙ И ТОМОВ ----------
+let ctxActiveType = ''; // 'series' or 'volume'
+let ctxActiveSeries = '';
+let ctxActiveId = null;
+
+function handleSeriesContextMenu(event, seriesName) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    ctxActiveType = 'series';
+    ctxActiveSeries = seriesName;
+    ctxActiveId = null;
+    
+    const vols = state.database.filter(x => String(x.series || x.t).trim() === String(seriesName).trim());
+    if (!vols.length) return;
+    
+    const hasAnyOwned = vols.some(v => {
+        const col = state.collection[v.id];
+        return col && col.owned === true;
+    });
+    
+    const hasAnyRead = vols.some(v => {
+        const col = state.collection[v.id];
+        return col && col.read === true;
+    });
+
+    const hasAnyWishlist = vols.some(v => {
+        const col = state.collection[v.id];
+        return col && col.wishlist === true;
+    });
+    
+    const btnOwned = document.getElementById('ctxToggleOwned');
+    const btnRead = document.getElementById('ctxToggleRead');
+    const btnWishlist = document.getElementById('ctxToggleWishlist');
+    const btnSearchGoogle = document.getElementById('ctxSearchGoogle');
+    const btnGoToSeries = document.getElementById('ctxGoToSeries');
+    const dividerGoToSeries = document.getElementById('ctxGoToSeriesDivider');
+
+    if (btnGoToSeries) btnGoToSeries.style.display = 'none';
+    if (dividerGoToSeries) dividerGoToSeries.style.display = 'none';
+    
+    if (btnOwned) {
+        btnOwned.textContent = hasAnyOwned ? '❌ Удалить из коллекции' : '🏆 Добавить в коллекцию';
+        btnOwned.dataset.action = hasAnyOwned ? 'remove' : 'add';
+    }
+    
+    if (btnRead) {
+        btnRead.textContent = hasAnyRead ? '❌ Удалить из прочитанного' : '📖 Добавить в прочитанное';
+        btnRead.dataset.action = hasAnyRead ? 'remove' : 'add';
+    }
+
+    if (btnWishlist) {
+        btnWishlist.textContent = hasAnyWishlist ? '❌ Удалить из вишлиста' : '⭐ Добавить в вишлист';
+        btnWishlist.dataset.action = hasAnyWishlist ? 'remove' : 'add';
+    }
+
+    if (btnSearchGoogle) {
+        const query = (seriesName || '').trim() + ' манга';
+        btnSearchGoogle.href = 'https://www.google.com/search?q=' + encodeURIComponent(query);
+    }
+    
+    showContextMenu(event);
+}
+
+function handleVolumeContextMenu(event, itemId) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    ctxActiveType = 'volume';
+    ctxActiveId = itemId;
+    ctxActiveSeries = '';
+    
+    const col = state.collection[itemId] || { owned: false, read: false, wishlist: false };
+    const isOwned = col.owned === true;
+    const isRead = col.read === true;
+    const isWishlist = col.wishlist === true;
+    
+    const btnOwned = document.getElementById('ctxToggleOwned');
+    const btnRead = document.getElementById('ctxToggleRead');
+    const btnWishlist = document.getElementById('ctxToggleWishlist');
+    const btnSearchGoogle = document.getElementById('ctxSearchGoogle');
+    const btnGoToSeries = document.getElementById('ctxGoToSeries');
+    const dividerGoToSeries = document.getElementById('ctxGoToSeriesDivider');
+    
+    const item = state.database.find(i => String(i.id) === String(itemId));
+
+    if (btnGoToSeries && dividerGoToSeries) {
+        if (item) {
+            const seriesName = String(item.series || item.t).trim();
+            const isOneshot = item.oneshot === true || (item.v === 1 && item.tv === 1);
+            const alreadyInSeriesView = state.seriesView && state.seriesView.toLowerCase() === seriesName.toLowerCase();
+            
+            if (!isOneshot && !alreadyInSeriesView) {
+                btnGoToSeries.style.display = 'block';
+                dividerGoToSeries.style.display = 'block';
+            } else {
+                btnGoToSeries.style.display = 'none';
+                dividerGoToSeries.style.display = 'none';
+            }
+        } else {
+            btnGoToSeries.style.display = 'none';
+            dividerGoToSeries.style.display = 'none';
+        }
+    }
+    
+    if (btnOwned) {
+        btnOwned.textContent = isOwned ? '❌ Удалить из коллекции' : '🏆 Добавить в коллекцию';
+        btnOwned.dataset.action = isOwned ? 'remove' : 'add';
+    }
+    
+    if (btnRead) {
+        btnRead.textContent = isRead ? '❌ Удалить из прочитанного' : '📖 Добавить в прочитанное';
+        btnRead.dataset.action = isRead ? 'remove' : 'add';
+    }
+
+    if (btnWishlist) {
+        btnWishlist.textContent = isWishlist ? '❌ Удалить из вишлиста' : '⭐ Добавить в вишлист';
+        btnWishlist.dataset.action = isWishlist ? 'remove' : 'add';
+    }
+
+    if (btnSearchGoogle) {
+        let query = '';
+        if (item) {
+            const title = (item.t || '').trim();
+            query = `${title} манга`;
+        }
+        btnSearchGoogle.href = 'https://www.google.com/search?q=' + encodeURIComponent(query);
+    }
+    
+    showContextMenu(event);
+}
+
+function ctxGoToSeries() {
+    const menu = document.getElementById('seriesContextMenu');
+    if (menu) menu.style.display = 'none';
+    
+    if (ctxActiveType === 'volume' && ctxActiveId !== null) {
+        const item = state.database.find(i => String(i.id) === String(ctxActiveId));
+        if (item) {
+            const seriesName = String(item.series || item.t).trim();
+            const isOneshot = item.oneshot === true || (item.v === 1 && item.tv === 1);
+            if (!isOneshot) {
+                openSeries(seriesName);
+            }
+        }
+    }
+}
+
+function showContextMenu(event) {
+    const menu = document.getElementById('seriesContextMenu');
+    if (menu) {
+        // IDs of the menu items we want to manage
+        const ids = ['ctxGoToSeries', 'ctxToggleOwned', 'ctxToggleRead', 'ctxToggleWishlist', 'ctxSearchGoogle'];
+        const items = ids.map(id => document.getElementById(id)).filter(Boolean);
+        
+        // Remove existing dividers
+        menu.querySelectorAll('.context-menu-divider').forEach(d => d.remove());
+        
+        const normalVisible = [];
+        const deleteVisible = [];
+        const hiddenItems = [];
+        
+        items.forEach(item => {
+            const isVisible = item.style.display !== 'none';
+            if (isVisible) {
+                const text = item.textContent || '';
+                if (text.includes('❌') || text.toLowerCase().includes('удалить')) {
+                    deleteVisible.push(item);
+                } else {
+                    normalVisible.push(item);
+                }
+            } else {
+                hiddenItems.push(item);
+            }
+        });
+        
+        // Put all visible items in order: normal first, followed by deletion items
+        const orderedVisible = [...normalVisible, ...deleteVisible];
+        
+        // Append them in order with new dividers
+        orderedVisible.forEach((item, index) => {
+            menu.appendChild(item);
+            if (index < orderedVisible.length - 1) {
+                const divider = document.createElement('div');
+                divider.className = 'context-menu-divider';
+                menu.appendChild(divider);
+            }
+        });
+        
+        // Keep hidden items in the DOM so they can be retrieved and shown again on future clicks
+        hiddenItems.forEach(item => {
+            menu.appendChild(item);
+        });
+
+        menu.style.display = 'block';
+        
+        const menuWidth = menu.offsetWidth || 250;
+        const menuHeight = menu.offsetHeight || 175;
+        let x = event.clientX;
+        let y = event.clientY;
+        
+        if (x + menuWidth > window.innerWidth) {
+            x = window.innerWidth - menuWidth - 10;
+        }
+        if (y + menuHeight > window.innerHeight) {
+            y = window.innerHeight - menuHeight - 10;
+        }
+        
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+    }
+
+    // Эффект вспышки рамки при правом клике
+    if (event) {
+        const card = event.target ? event.target.closest('.manga-card') : null;
+        if (card) {
+            card.classList.remove('sparking');
+            // Force a reflow to restart animation if triggered multiple times
+            void card.offsetWidth;
+            card.classList.add('sparking');
+            
+            setTimeout(() => {
+                card.classList.remove('sparking');
+            }, 500);
+        }
+    }
+}
+
+function ctxAddRemoveOwned() {
+    const btnOwned = document.getElementById('ctxToggleOwned');
+    if (!btnOwned) return;
+    
+    const action = btnOwned.dataset.action;
+    
+    if (ctxActiveType === 'volume' && ctxActiveId !== null) {
+        const col = state.collection[ctxActiveId] || { owned: false, read: false, wishlist: false };
+        if (action === 'add') {
+            state.collection[ctxActiveId] = {
+                owned: true,
+                wishlist: col.wishlist,
+                read: col.read
+            };
+        } else {
+            state.collection[ctxActiveId] = {
+                owned: false,
+                wishlist: col.wishlist,
+                read: col.read
+            };
+        }
+    } else if (ctxActiveType === 'series' && ctxActiveSeries) {
+        const vols = state.database.filter(x => String(x.series || x.t).trim() === String(ctxActiveSeries).trim());
+        vols.forEach(v => {
+            const col = state.collection[v.id] || { owned: false, read: false, wishlist: false };
+            if (action === 'add') {
+                state.collection[v.id] = {
+                    owned: true,
+                    wishlist: col.wishlist,
+                    read: col.read
+                };
+            } else {
+                state.collection[v.id] = {
+                    owned: false,
+                    wishlist: col.wishlist,
+                    read: col.read
+                };
+            }
+        });
+    }
+    
+    saveData();
+    render(true);
+    buildSidebar();
+    
+    const menu = document.getElementById('seriesContextMenu');
+    if (menu) menu.style.display = 'none';
+}
+
+function ctxAddRemoveRead() {
+    const btnRead = document.getElementById('ctxToggleRead');
+    if (!btnRead) return;
+    
+    const action = btnRead.dataset.action;
+    
+    if (ctxActiveType === 'volume' && ctxActiveId !== null) {
+        const col = state.collection[ctxActiveId] || { owned: false, read: false, wishlist: false };
+        if (action === 'add') {
+            state.collection[ctxActiveId] = {
+                owned: col.owned,
+                wishlist: col.wishlist,
+                read: true
+            };
+        } else {
+            state.collection[ctxActiveId] = {
+                owned: col.owned,
+                wishlist: col.wishlist,
+                read: false
+            };
+        }
+    } else if (ctxActiveType === 'series' && ctxActiveSeries) {
+        const vols = state.database.filter(x => String(x.series || x.t).trim() === String(ctxActiveSeries).trim());
+        vols.forEach(v => {
+            const col = state.collection[v.id] || { owned: false, read: false, wishlist: false };
+            if (action === 'add') {
+                state.collection[v.id] = {
+                    owned: col.owned,
+                    wishlist: col.wishlist,
+                    read: true
+                };
+            } else {
+                state.collection[v.id] = {
+                    owned: col.owned,
+                    wishlist: col.wishlist,
+                    read: false
+                };
+            }
+        });
+    }
+    
+    saveData();
+    render(true);
+    buildSidebar();
+    
+    const menu = document.getElementById('seriesContextMenu');
+    if (menu) menu.style.display = 'none';
+}
+
+function ctxAddRemoveWishlist() {
+    const btnWishlist = document.getElementById('ctxToggleWishlist');
+    if (!btnWishlist) return;
+    
+    const action = btnWishlist.dataset.action;
+    
+    if (ctxActiveType === 'volume' && ctxActiveId !== null) {
+        const col = state.collection[ctxActiveId] || { owned: false, read: false, wishlist: false };
+        if (action === 'add') {
+            state.collection[ctxActiveId] = {
+                owned: col.owned,
+                wishlist: true,
+                read: col.read
+            };
+        } else {
+            state.collection[ctxActiveId] = {
+                owned: col.owned,
+                wishlist: false,
+                read: col.read
+            };
+        }
+    } else if (ctxActiveType === 'series' && ctxActiveSeries) {
+        const vols = state.database.filter(x => String(x.series || x.t).trim() === String(ctxActiveSeries).trim());
+        vols.forEach(v => {
+            const col = state.collection[v.id] || { owned: false, read: false, wishlist: false };
+            if (action === 'add') {
+                state.collection[v.id] = {
+                    owned: col.owned,
+                    wishlist: true,
+                    read: col.read
+                };
+            } else {
+                state.collection[v.id] = {
+                    owned: col.owned,
+                    wishlist: false,
+                    read: col.read
+                };
+            }
+        });
+    }
+    
+    saveData();
+    render(true);
+    buildSidebar();
+    
+    const menu = document.getElementById('seriesContextMenu');
+    if (menu) menu.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('seriesContextMenu');
+    if (menu) menu.style.display = 'none';
+
+    if (!e.target.closest('.custom-select')) {
+        document.querySelectorAll('.custom-select').forEach(cs => {
+            cs.classList.remove('open');
+        });
+    }
+});
+
+document.addEventListener('contextmenu', (e) => {
+    const menu = document.getElementById('seriesContextMenu');
+    if (menu && !e.target.closest('.manga-card')) {
+        menu.style.display = 'none';
+    }
+});
+
+window.addEventListener('scroll', () => {
+    const menu = document.getElementById('seriesContextMenu');
+    if (menu) menu.style.display = 'none';
+    
+    document.querySelectorAll('.custom-select').forEach(cs => {
+        cs.classList.remove('open');
+    });
+}, { passive: true });
 
 init();
