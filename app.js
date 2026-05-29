@@ -1684,7 +1684,8 @@ const CURRENT_VERSION = '0.8.9';
 
 async function checkForUpdates() {
     try {
-        const res = await fetch('/?cb=' + Date.now(), { cache: 'no-cache' });
+        const path = window.location.pathname || '/';
+        const res = await fetch(path + '?cb=' + Date.now(), { cache: 'no-cache' });
         if (!res.ok) return;
         const contentType = res.headers.get('content-type') || '';
         if (!contentType.includes('text/html')) {
