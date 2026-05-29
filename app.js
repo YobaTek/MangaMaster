@@ -1877,7 +1877,7 @@ function handleVolumeContextMenu(event, itemId) {
     
     const item = state.database.find(i => String(i.id) === String(itemId));
 
-    if (btnGoToSeries && dividerGoToSeries) {
+    if (btnGoToSeries) {
         if (item) {
             const seriesName = String(item.series || item.t).trim();
             const isOneshot = item.oneshot === true || (item.v === 1 && item.tv === 1);
@@ -1885,14 +1885,14 @@ function handleVolumeContextMenu(event, itemId) {
             
             if (!isOneshot && !alreadyInSeriesView) {
                 btnGoToSeries.style.display = 'block';
-                dividerGoToSeries.style.display = 'block';
+                if (dividerGoToSeries) dividerGoToSeries.style.display = 'block';
             } else {
                 btnGoToSeries.style.display = 'none';
-                dividerGoToSeries.style.display = 'none';
+                if (dividerGoToSeries) dividerGoToSeries.style.display = 'none';
             }
         } else {
             btnGoToSeries.style.display = 'none';
-            dividerGoToSeries.style.display = 'none';
+            if (dividerGoToSeries) dividerGoToSeries.style.display = 'none';
         }
     }
     
