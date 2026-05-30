@@ -12,6 +12,9 @@
   <img src="https://img.shields.io/badge/status-active-brightgreen" alt="Status Active">
 </p>
 
+<img width="1920" height="911" alt="2026-05-30_213603" src="https://github.com/user-attachments/assets/01d9f900-1d23-488b-a828-fedaa94afbca" />
+
+
 ## 📖 О проекте
 
 **MangaMaster** — это веб-приложение (SPA), которое помогает структурировать и отслеживать вашу коллекцию манги, ориентируясь на официальные российские издания.  
