@@ -11805,7 +11805,7 @@
     "oneshot": false
   },
   {
-    "id": 1780297912727,
+    "id": "1780297912727",
     "t": "Стесняшка",
     "series": "Стесняшка",
     "a": [
@@ -11820,7 +11820,7 @@
     "y": "2026",
     "isbn": "9785171808891",
     "pub": "Reanimedia",
-    "c": "",
+    "c": "https://i.postimg.cc/W4PLJPDx/001.jpg",
     "oneshot": false
   }
 ]
